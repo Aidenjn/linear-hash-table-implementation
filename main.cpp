@@ -38,6 +38,10 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+int getRecordSize(struct record r) {
+    return r.id.length() + r.name.length() + r.bio.length() + r.manager_id.length();
+}
+
 struct record* add_record(string id, string name, string bio, string manager_id) {
 
     // Check to see if attributes are correct byte lengths
