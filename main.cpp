@@ -3,9 +3,14 @@
 #include <fstream>
 #include <vector>
 #include <sstream>
+#include <iterator>
+#include <map>
+#include <bitset>
+#include <math.h>
 
 using namespace std;
 
+// Struct for holding records
 struct record {
   string id; // Fixed at 8 bytes
   string name; // Max of 200 bytes
@@ -13,8 +18,24 @@ struct record {
   string manager_id; // Fixed at 8 bytes
 };
 
-struct record* add_record(string id, string name, string bio, string manager_id);
-vector<struct record> readRecords(string csvName);
+// Global Variables
+vector<struct record> readRecords(string csvName); // Record list
+map<string, vector<struct record>> lhTable; // Linear Hash Table
+int buckets = 2; // amount of buckets currently in the table
+int bitRep = 1; // amount of bits currently being used in the keys
+int totalSpaceUsed = 0; // amount of bytes the records are taking up
+string toBinary(int n);
+
+
+// Function prototypes
+void createIndex();
+void lookupId(string id);
+struct record* add_record(string id, string name, string bio, string manager_id); 
+int binaryStrToDecimal(string str);
+string idToBitString(string id);
+string getLastIBits(string key, int i);
+string flipBits(string key);
+void insertRecord(struct record rec);
 
 int main(int argc, char* argv[])
 {
@@ -27,15 +48,44 @@ int main(int argc, char* argv[])
     }
     cout << "Correct number of arguments given" << endl;
 
+    string mode = argv[1];
+
+    if (mode ==  "-C") { // Create table mode
+        createIndex();
+    }
+    else if (mode ==  "-L") { // Lookup mode 
+        string id = argv[2];
+        lookupId(id);
+    }
+
+
+
+    return 0;
+}
+
+void createIndex() {
+    cout << "Creating index from csv file..." << endl;
 
     //struct record* newRecord = add_record("10000000", "Dan", "Likes dogs", "00000001");
     //cout << newRecord->bio << endl;
 
+
     vector<struct record> csvRecords = readRecords("Employee.csv");
+    //cout << csvRecords[1].name << endl; 
 
-    cout << csvRecords[1].name << endl; 
+    // Initialize lht with 1 bit
+    lhTable.insert(pair<string, vector<struct record>>("0", vector<struct record>()));
+    lhTable.insert(pair<string, vector<struct record>>("1", vector<struct record>()));
 
-    return 0;
+    for (int i=0; i < csvRecords.size(); i++) {
+        insertRecord(csvRecords[i]);
+    }
+
+}
+
+void lookupId(string id) {
+    cout << "Looking up " << id << " in index data..." << endl;
+
 }
 
 int getRecordSize(struct record r) {
@@ -89,5 +139,93 @@ vector<struct record> readRecords(string csvName){
         csvAttributes.clear();
     }
     return records;
+}
+
+int binaryStrToDecimal(string str) {
+    int num = 0;
+    for (int i = str.length() - 1; i == 0; i--) {
+        if (str[i] == '1') {
+            num += pow(2, i);
+        }
+    }
+    return num;
+}
+
+// Code taken from stack overflow user user3478487
+// Reference link: https://stackoverflow.com/questions/22746429/c-decimal-to-binary-converting/22746526
+string toBinary(int n)
+{
+    std::string r;
+    while(n!=0) {r=(n%2==0 ?"0":"1")+r; n/=2;}
+    return r;
+}
+
+
+string idToBitString(string id) {
+    string bitstring = "";
+    for (char& letter : id) {
+        bitstring += bitset<8>(letter).to_string();
+    }
+    return bitstring;
+}
+
+string getLastIBits(string key, int i) {
+    return key.substr(key.length()-i);
+}
+
+string flipBits(string key) {
+    for (int i=0; i < key.length(); i++) {
+        if (key[i] == '0') {
+            key[i] = '1';
+        }
+        else if (key[i] == '1') {
+            key[i] = '0';
+        }
+    }
+    return key;
+}
+
+
+void insertRecord(struct record rec) {
+    string key = idToBitString(rec.id);
+    key = getLastIBits(key, bitRep);
+    
+    // Flip bits if decimal rep is bigger than bucket amount
+    if (binaryStrToDecimal(key) >= buckets) {
+        key = flipBits(key);
+
+    }
+
+    cout << "ID: " << rec.id << ", key: " << key << endl;
+    cout << "BinaryRep: " << binaryStrToDecimal(key) << endl;
+
+    // Find bucket based on key
+    vector <struct record> bucket = lhTable.find(key)->second;
+    bucket.push_back(rec);
+
+    // Add to space count
+    totalSpaceUsed += getRecordSize(rec);
+
+    // Trigger extension if overload occurs
+    //if (totalSpaceUsed / 4096 > 0.8) {
+    if (totalSpaceUsed / 40 > 0.8) {
+       buckets++;
+       if (buckets > pow(2, bitRep)) { // Extend key if necessary
+           bitRep++;
+           reorderTable();
+       }
+
+       // Add new bucket
+       lhTable.insert(pair<string, vector<struct record>>(toBinary(buckets - 1), vector<struct record>()));
+    }
+}
+
+void reorderTable() {
+    map<string, vector<struct record>> iter;
+
+    for (itr = gquiz1.begin(); itr != gquiz1.end(); ++itr) { 
+        cout << '\t' << itr->first 
+             << '\t' << itr->second << '\n'; 
+    } 
 }
 
