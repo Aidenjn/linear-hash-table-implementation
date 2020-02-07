@@ -19,11 +19,9 @@ struct record {
 };
 
 // Global Variables
-map<string, vector<struct record>> lhTable; // Linear Hash Table
 int buckets; // amount of buckets currently in the index
 int bitRep; // amount of bits currently being used in the keys
 int totalSpaceUsed; // amount of bytes the records are taking up
-
 
 // Function prototypes
 void processRecords(string csvName);
@@ -46,16 +44,10 @@ vector<struct record> readRecordsAtIndex(string index);
 void writeRecordsAtIndex(string index, vector<struct record> records);
 string idToIndexKey(string id);
 void initIndex();
+void handleFlippedKeyValues(string key);
 
 int main(int argc, char* argv[])
 {
-    
-    //readRecordsAtIndex("11");
-    //cout << toBinary(3) << endl;
-    //cout << binaryStrToDecimal("1001") << endl;
-    //addLineToIndex("Whatttt");
-    //changeLineOfIndex(2, "cars");
-
     if (argc < 2) {
         cerr << "Usage: " << endl;
         cerr << "For tuple lookup: " << argv[0] << " -L [ID]" << endl;
@@ -87,31 +79,12 @@ void createIndex() {
     buckets = 2;
     totalSpaceUsed = 0;
 
-
-    //struct record* newRecord = add_record("10000000", "Dan", "Likes dogs", "00000001");
-    //cout << newRecord->bio << endl;
-
-
-    //vector<struct record> csvRecords = processRecords("Employee.csv");
     processRecords("Employee.csv");
-    //cout << csvRecords[1].name << endl; 
-
-    // Initialize lht with 1 bit
-
-
-
-    /*
-    lhTable.insert(pair<string, vector<struct record>>("0", vector<struct record>()));
-    lhTable.insert(pair<string, vector<struct record>>("1", vector<struct record>()));
-
-    for (int i=0; i < csvRecords.size(); i++) {
-        insertRecord(csvRecords[i]);
-    }
-    */
 }
 
 void lookupId(string id) {
     cout << "Looking up " << id << " in index data..." << endl;
+    bool foundID = false;
     
     // Find amount of bits used to represent keys
     int keySize = 0;
@@ -134,17 +107,22 @@ void lookupId(string id) {
 
     // lookup records with key
     vector<struct record> records = readRecordsAtIndex(key);
-    cout << records.size() << endl;
 
     for (int i = 0; i < records.size(); i++) {
         if (records[i].id == id) {
             cout << "Record Found ->" << endl;
-            cout << "ID: " << records[i].id << endl;
-            cout << "Name: " << records[i].name << endl;
-            cout << "Bio: " << records[i].bio << endl;
-            cout << "Manager ID: " << records[i].manager_id << endl;
+            cout << "\tID: " << records[i].id << endl;
+            cout << "\tName: " << records[i].name << endl;
+            cout << "\tBio: " << records[i].bio << endl;
+            cout << "\tManager ID: " << records[i].manager_id << endl;
+            foundID = true;
         }
     }
+
+    if (foundID == false) {
+        cout << "Could not find record." << endl;
+    }
+
 }
 
 int getRecordSize(struct record r) {
@@ -154,7 +132,6 @@ int getRecordSize(struct record r) {
 struct record* add_record(string id, string name, string bio, string manager_id) {
 
     // Check to see if attributes are correct byte lengths
-    // cout << "Length of id is " << id.length() << endl;
     if (id.length() != 8) {
         cerr << "ERROR: id value [" << id << "] not 8 bytes" << endl;
     }
@@ -180,7 +157,6 @@ struct record* add_record(string id, string name, string bio, string manager_id)
 }
 
 void processRecords(string csvName){
-    //vector<struct record> records;
     vector<string> csvAttributes;
     string attribute; // For tokenizing csv lines
     ifstream infile(csvName);
@@ -188,21 +164,16 @@ void processRecords(string csvName){
 
     for(string line; getline(infile, line);)
     {
-        //cout << line << endl;
         stringstream linestream(line);
         while (getline(linestream, attribute, ','))
         {
-            //cout << attribute << endl;
             csvAttributes.push_back(attribute);
         }
-        //records.push_back(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
         
         // Add record to index
         insertRecord(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
-
         csvAttributes.clear();
     }
-    //return records;
 }
 
 vector<struct record> readRecordsAtIndex(string index){
@@ -222,7 +193,6 @@ vector<struct record> readRecordsAtIndex(string index){
     {
         stringstream recordstream(record);
         while (getline(recordstream, attribute, ',')) {
-            cout << attribute << endl;
             attributes.push_back(attribute);
         }
         records.push_back(*add_record(attributes[0], attributes[1], attributes[2], attributes[3]));
@@ -239,7 +209,6 @@ void writeRecordsAtIndex(string index, vector<struct record> records) {
 
     int linenumber = getIndexLineNumber(index);
     string line = getLineOfIndex(linenumber);
-    //line = line.substr(index.length() 1+ , line.length()); // remove key from front of line
     string key = line.substr(0, bitRep + 1); // get key from front of line
     string writeline = key;
 
@@ -263,7 +232,7 @@ int binaryStrToDecimal(string str) {
     return num;
 }
 
-// Code taken from stack overflow user user3478487
+// Code refrenced from stack overflow user user3478487
 // Reference link: https://stackoverflow.com/questions/22746429/c-decimal-to-binary-converting/22746526
 string toBinary(int n)
 {
@@ -292,22 +261,11 @@ string flipBit(string key) {
     else if (key[0] == '1') {
         key[0] = '0';
     }
-    /*
-    for (int i=0; i < key.length(); i++) {
-        if (key[i] == '0') {
-            key[i] = '1';
-        }
-        else if (key[i] == '1') {
-            key[i] = '0';
-        }
-    }
-    */
     return key;
 }
 
 string idToIndexKey(string id) {
     string key = idToBitString(id);
-    //cout << "bitstring: " << key << endl;
     key = getLastIBits(key, bitRep);
 
     // Flip bits if decimal rep is bigger than bucket amount
@@ -322,13 +280,7 @@ string idToIndexKey(string id) {
 void insertRecord(struct record rec) {
     string key = idToIndexKey(rec.id);
 
-    //cout << "ID: " << rec.id << ", key: " << key << endl;
-    //cout << "BinaryRep: " << binaryStrToDecimal(key) << endl;
-
     // Find bucket based on key
-    //vector <struct record> bucket = lhTable.find(key)->second;
-    //bucket.push_back(rec);
-
     vector<struct record> bucketRecords = readRecordsAtIndex(key);
     bucketRecords.push_back(rec);
     // Add to space count
@@ -336,41 +288,108 @@ void insertRecord(struct record rec) {
 
     writeRecordsAtIndex(key, bucketRecords);
 
+    
     // Trigger extension if overload occurs
-    //if (totalSpaceUsed / 4096 > 0.8) {
-    /*
-    if (totalSpaceUsed / 40 > 0.8) {
-       buckets++;
-       if (buckets > pow(2, bitRep)) { // Extend key if necessary
+    if (totalSpaceUsed / 4096 > 0.8) { // if space goes over load factor
+        // Extend if necessary
+        if (buckets + 1 > pow(2, bitRep)) {
            bitRep++;
-           reorderTable();
-       }
+           reorderTable(); // Increase indexes and reorder
+        }
+        buckets++;
 
-       // Add new bucket
-       //lhTable.insert(pair<string, vector<struct record>>(toBinary(buckets - 1), vector<struct record>()));
+        string newBucketKey = toBinary(buckets - 1);
+        addLineToIndex(newBucketKey + "|");
 
+        // put unfliped values in proper bucket
+        handleFlippedKeyValues(newBucketKey);
+        
     }
-    */
+}
+
+void handleFlippedKeyValues(string key) {
+    vector<struct record> recordsAtOldBucket;
+    string intendedKey;
+    struct record moveRecord;
+    vector<struct record> recordsAtBucketToMoveTo;
+    vector<int> recordsToErase;
+
+    string flipKey = flipBit(key);
+
+    recordsAtOldBucket = readRecordsAtIndex(flipKey);
+
+    for (int j = 0; j < recordsAtOldBucket.size(); j++) {
+        intendedKey = idToIndexKey(recordsAtOldBucket[j].id);
+        
+        if (intendedKey != flipKey) {
+            moveRecord = recordsAtOldBucket[j];
+            recordsToErase.push_back(j);
+            recordsAtBucketToMoveTo = readRecordsAtIndex(intendedKey);
+            recordsAtBucketToMoveTo.push_back(moveRecord);
+            writeRecordsAtIndex(intendedKey, recordsAtBucketToMoveTo);
+        }
+    }
+
+    // Erase moved buckets at original values to prevent duplicates
+    for (int j = 0; j < recordsToErase.size(); j++) {
+        recordsAtOldBucket.erase(recordsAtOldBucket.begin()+recordsToErase[j]);
+        writeRecordsAtIndex(flipKey, recordsAtOldBucket);
+    }
+    
+    recordsToErase.clear();
 }
 
 void reorderTable() {
-    map<string, vector<struct record>> iter;
     int count = 0;
-
-    // Print old table
-    /*
-    for (itr = lhTable.begin(); itr != lhTable.end(); ++itr) { 
-        cout << "BucketNumber: " << count << endl;
-        cout << '\t' << itr->first 
-             << '\t' << itr->second << '\n'; 
-    } 
-
-    // change keys 
+    string bucketKey;
+    string line;
+    vector<struct record> recordsAtBucket;
+    string intendedKey;
+    struct record moveRecord;
+    vector<struct record> recordsAtBucketToMoveTo;
+    vector<int> recordsToErase;
     
-    for (itr = lhTable.begin(); itr != lhTable.end(); ++itr) { 
+    // Change keys
+    for (int i = 0; i < buckets; i++) {
+        bucketKey = toBinary(i);
+        int zeros = bitRep - bucketKey.length();
+        for (int j = 0; j < zeros; j++) {
+            bucketKey = "0" + bucketKey;
+        }
+        line = getLineOfIndex(i + 1);
+        line = bucketKey + line.substr(bitRep - 1, line.length());
+        changeLineOfIndex(i + 1, line);
+    }
 
-    } 
-    */
+    // Reorder records to new keys
+    for (int i = 0; i < buckets; i++) {
+        bucketKey = toBinary(i);
+        int zeros = bitRep - bucketKey.length();
+        for (int j = 0; j < zeros; j++) {
+            bucketKey = "0" + bucketKey;
+        }
+        recordsAtBucket = readRecordsAtIndex(bucketKey);
+
+        for (int j = 0; j < recordsAtBucket.size(); j++) {
+            intendedKey = idToIndexKey(recordsAtBucket[j].id);
+            
+            if (intendedKey != bucketKey) {
+                moveRecord = recordsAtBucket[j];
+                recordsToErase.push_back(j);
+                recordsAtBucketToMoveTo = readRecordsAtIndex(intendedKey);
+                recordsAtBucketToMoveTo.push_back(moveRecord);
+                writeRecordsAtIndex(intendedKey, recordsAtBucketToMoveTo);
+            }
+        }
+
+        // Erase moved buckets at original values to prevent duplicates
+        for (int j = 0; j < recordsToErase.size(); j++) {
+            recordsAtBucket.erase(recordsAtBucket.begin()+recordsToErase[j]);
+            writeRecordsAtIndex(bucketKey, recordsAtBucket);
+        }
+        
+        recordsToErase.clear();
+    }
 }
 
 int countLinesOfIndex() {
@@ -381,6 +400,7 @@ int countLinesOfIndex() {
     while (getline(indexfile, line)) {
         count++;
     }
+    indexfile.close();
     return count;
 }
 
@@ -394,6 +414,7 @@ string getLineOfIndex(int lineNumber) {
         }
     }
     getline(indexfile, line);
+    indexfile.close();
     return line;
 }
 
@@ -401,7 +422,6 @@ void changeLineOfIndex(int lineNumber, string newLine) {
     string line;
     ifstream indexfile {"EmployeeIndex"};
     ofstream newIndexFile {"NewEmployeeIndex"};
-
     for (int i=0; i < lineNumber-1; i++) {
         if (!getline(indexfile, line)) {
             cerr << "ERROR: File does not extend to line " << lineNumber << endl;
@@ -409,6 +429,7 @@ void changeLineOfIndex(int lineNumber, string newLine) {
         newIndexFile << line + "\n";
     }
 
+    
     // insert new line
     newIndexFile << newLine + "\n";
 
@@ -420,13 +441,14 @@ void changeLineOfIndex(int lineNumber, string newLine) {
         newIndexFile << line + "\n";
     }
 
+    indexfile.close();
+    newIndexFile.close();
     // Delete old index
     if (remove("EmployeeIndex")!=0) {
         cerr << "ERROR: Could not delete old index file" << endl;
     }
-    rename("NewEmployeeIndex", "EmployeeIndex");
-
     // Rename new index
+    rename("NewEmployeeIndex", "EmployeeIndex");
 }
 
 void addLineToIndex(string newLine) {
@@ -442,13 +464,17 @@ void addLineToIndex(string newLine) {
     // insert new line
     newIndexFile << newLine + "\n";
 
+    indexfile.close();
+    newIndexFile.close();
+
     // Delete old index
     if (remove("EmployeeIndex")!=0) {
         cerr << "ERROR: Could not delete old index file" << endl;
     }
+    // Rename new index
     rename("NewEmployeeIndex", "EmployeeIndex");
 
-    // Rename new index
+    
 }
 
 int getIndexLineNumber(string index) {
@@ -459,9 +485,11 @@ int getIndexLineNumber(string index) {
     while (getline(indexfile, line)) {
         lineNumber++;
         if (index == line.substr(0, bitRep)) {
+            indexfile.close();
             return lineNumber;
         }
     }
+    indexfile.close();
     cerr << "ERROR: Could not find line number for index" << endl;
     return -5;
 }
@@ -476,6 +504,8 @@ void initIndex() {
 
     indexfile << "0|\n";
     indexfile << "1|\n";
+
+    indexfile.close();
 }
 
 
