@@ -80,6 +80,7 @@ void createIndex() {
     totalSpaceUsed = 0;
 
     processRecords("Employee.csv");
+    cout << "Index Created!" << endl;
 }
 
 void lookupId(string id) {
