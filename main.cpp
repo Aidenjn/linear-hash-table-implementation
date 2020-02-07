@@ -22,9 +22,8 @@ struct record {
 vector<struct record> readRecords(string csvName); // Record list
 map<string, vector<struct record>> lhTable; // Linear Hash Table
 int buckets = 2; // amount of buckets currently in the table
-int bitRep = 1; // amount of bits currently being used in the keys
+int bitRep = 2; // amount of bits currently being used in the keys
 int totalSpaceUsed = 0; // amount of bytes the records are taking up
-string toBinary(int n);
 
 
 // Function prototypes
@@ -35,10 +34,22 @@ int binaryStrToDecimal(string str);
 string idToBitString(string id);
 string getLastIBits(string key, int i);
 string flipBits(string key);
+string toBinary(int n);
+void reorderTable();
 void insertRecord(struct record rec);
+string getLineOfIndex(int lineNumber);
+void changeLineOfIndex(int lineNumber, string newLine);
+void addLineToIndex(string newLine);
+int getIndexLineNumber(string index);
 
 int main(int argc, char* argv[])
 {
+    cout << getIndexLineNumber("11") << endl;
+    //cout << toBinary(3) << endl;
+    //cout << binaryStrToDecimal("1001") << endl;
+    //addLineToIndex("Whatttt");
+    //changeLineOfIndex(2, "cars");
+
     if (argc < 2) {
         cerr << "Usage: " << endl;
         cerr << "For tuple lookup: " << argv[0] << " -L [ID]" << endl;
@@ -141,11 +152,34 @@ vector<struct record> readRecords(string csvName){
     return records;
 }
 
+vector<struct record> readRecordsAtIndex(string index){
+    vector<struct record> records;
+    vector<string> attributes;
+    string attribute; // For tokenizing the line
+    ifstream infile("EmployeeIndex");
+/*
+    for(string line; getline(infile, line);)
+    {
+
+        //cout << line << endl;
+        stringstream linestream(line);
+        while (getline(linestream, attribute, ','))
+        {
+            //cout << attribute << endl;
+            csvAttributes.push_back(attribute);
+        }
+        records.push_back(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
+        csvAttributes.clear();
+    }
+    */
+    return records;
+}
+
 int binaryStrToDecimal(string str) {
     int num = 0;
-    for (int i = str.length() - 1; i == 0; i--) {
+    for (int i=0; i < str.length(); i++) {
         if (str[i] == '1') {
-            num += pow(2, i);
+            num += pow(2, str.length() - i - 1);
         }
     }
     return num;
@@ -222,10 +256,104 @@ void insertRecord(struct record rec) {
 
 void reorderTable() {
     map<string, vector<struct record>> iter;
+    int count = 0;
 
-    for (itr = gquiz1.begin(); itr != gquiz1.end(); ++itr) { 
+    // Print old table
+    /*
+    for (itr = lhTable.begin(); itr != lhTable.end(); ++itr) { 
+        cout << "BucketNumber: " << count << endl;
         cout << '\t' << itr->first 
              << '\t' << itr->second << '\n'; 
     } 
+
+    // change keys 
+    
+    for (itr = lhTable.begin(); itr != lhTable.end(); ++itr) { 
+
+    } 
+    */
 }
+
+string getLineOfIndex(int lineNumber) {
+    string line;
+    ifstream indexfile {"EmployeeIndex"};
+
+    for (int i=0; i < lineNumber-1; i++) {
+        if (!getline(indexfile, line)) {
+            cerr << "ERROR: File does not extend to line " << lineNumber << endl;
+        }
+    }
+    getline(indexfile, line);
+    return line;
+}
+
+void changeLineOfIndex(int lineNumber, string newLine) {
+    string line;
+    ifstream indexfile {"EmployeeIndex"};
+    ofstream newIndexFile {"NewEmployeeIndex"};
+
+    for (int i=0; i < lineNumber-1; i++) {
+        if (!getline(indexfile, line)) {
+            cerr << "ERROR: File does not extend to line " << lineNumber << endl;
+        }
+        newIndexFile << line + "\n";
+    }
+
+    // insert new line
+    newIndexFile << newLine + "\n";
+
+    // discard old line
+    getline(indexfile, line);
+
+    // write remaining lines of old file
+    while (getline(indexfile, line)) {
+        newIndexFile << line + "\n";
+    }
+
+    // Delete old index
+    if (remove("EmployeeIndex")!=0) {
+        cerr << "ERROR: Could not delete old index file" << endl;
+    }
+    rename("NewEmployeeIndex", "EmployeeIndex");
+
+    // Rename new index
+}
+
+void addLineToIndex(string newLine) {
+    string line;
+    ifstream indexfile {"EmployeeIndex"};
+    ofstream newIndexFile {"NewEmployeeIndex"};
+
+    // write lines of old file
+    while (getline(indexfile, line)) {
+        newIndexFile << line + "\n";
+    }
+
+    // insert new line
+    newIndexFile << newLine + "\n";
+
+    // Delete old index
+    if (remove("EmployeeIndex")!=0) {
+        cerr << "ERROR: Could not delete old index file" << endl;
+    }
+    rename("NewEmployeeIndex", "EmployeeIndex");
+
+    // Rename new index
+}
+
+int getIndexLineNumber(string index) {
+    string line;
+    ifstream indexfile {"EmployeeIndex"};
+    int lineNumber = 0;
+
+    while (getline(indexfile, line)) {
+        lineNumber++;
+        if (index == line.substr(0, bitRep)) {
+            return lineNumber;
+        }
+    }
+    cerr << "ERROR: Could not find line number for index" << endl;
+    return -5;
+}
+
 
