@@ -21,7 +21,7 @@ struct record {
 // Global Variables
 vector<struct record> readRecords(string csvName); // Record list
 map<string, vector<struct record>> lhTable; // Linear Hash Table
-int buckets = 2; // amount of buckets currently in the table
+int buckets = 4; // amount of buckets currently in the index
 int bitRep = 2; // amount of bits currently being used in the keys
 int totalSpaceUsed = 0; // amount of bytes the records are taking up
 
@@ -33,18 +33,22 @@ struct record* add_record(string id, string name, string bio, string manager_id)
 int binaryStrToDecimal(string str);
 string idToBitString(string id);
 string getLastIBits(string key, int i);
-string flipBits(string key);
+string flipBit(string key);
 string toBinary(int n);
 void reorderTable();
 void insertRecord(struct record rec);
 string getLineOfIndex(int lineNumber);
+int countLinesOfIndex();
 void changeLineOfIndex(int lineNumber, string newLine);
 void addLineToIndex(string newLine);
 int getIndexLineNumber(string index);
+vector<struct record> readRecordsAtIndex(string index);
+string idToIndexKey(string id);
 
 int main(int argc, char* argv[])
 {
-    cout << getIndexLineNumber("11") << endl;
+    
+    //readRecordsAtIndex("11");
     //cout << toBinary(3) << endl;
     //cout << binaryStrToDecimal("1001") << endl;
     //addLineToIndex("Whatttt");
@@ -70,7 +74,7 @@ int main(int argc, char* argv[])
     }
 
 
-
+idToBitString
     return 0;
 }
 
@@ -96,7 +100,27 @@ void createIndex() {
 
 void lookupId(string id) {
     cout << "Looking up " << id << " in index data..." << endl;
+    
+    // Find amount of bits used to represent keys
+    int keySize = 0;
+    string firstLine = getLineOfIndex(1); // get first line of index
+    char c;
+    do {
+        c = firstLine[keySize];
+        keySize++;
+    } while (c != '|');
+    keySize--; // don't include delimeter in character count
+    bitRep = keySize;
 
+    // createkey from id
+    string key = idToIndexKey(id);
+
+    // Print info
+    cout << "Key: " << key << endl;
+    cout << "Line of EmployeeIndex: " << getIndexLineNumber(key) << endl;
+
+    // lookup records with key
+    vector<struct record> records = readRecordsAtIndex(key);
 }
 
 int getRecordSize(struct record r) {
@@ -155,23 +179,26 @@ vector<struct record> readRecords(string csvName){
 vector<struct record> readRecordsAtIndex(string index){
     vector<struct record> records;
     vector<string> attributes;
+    string record; // For tokenizing the line
     string attribute; // For tokenizing the line
     ifstream infile("EmployeeIndex");
-/*
-    for(string line; getline(infile, line);)
-    {
 
-        //cout << line << endl;
-        stringstream linestream(line);
-        while (getline(linestream, attribute, ','))
-        {
-            //cout << attribute << endl;
-            csvAttributes.push_back(attribute);
+    int linenumber = getIndexLineNumber(index);
+    string line = getLineOfIndex(linenumber);
+    line = line.substr(index.length() + 1, line.length()); // remove key from front of line
+
+    stringstream linestream(line);
+
+    while (getline(linestream, record, '|'))
+    {
+        stringstream recordstream(record);
+        while (getline(recordstream, attribute, ',')) {
+            cout << attribute << endl;
+            attributes.push_back(attribute);
         }
-        records.push_back(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
-        csvAttributes.clear();
+        records.push_back(*add_record(attributes[0], attributes[1], attributes[2], attributes[3]));
+        attributes.clear();
     }
-    */
     return records;
 }
 
@@ -207,7 +234,14 @@ string getLastIBits(string key, int i) {
     return key.substr(key.length()-i);
 }
 
-string flipBits(string key) {
+string flipBit(string key) {
+    if (key[0] == '0') {
+            key[0] = '1';
+    }
+    else if (key[0] == '1') {
+        key[0] = '0';
+    }
+    /*
     for (int i=0; i < key.length(); i++) {
         if (key[i] == '0') {
             key[i] = '1';
@@ -216,6 +250,20 @@ string flipBits(string key) {
             key[i] = '0';
         }
     }
+    */
+    return key;
+}
+
+string idToIndexKey(string id) {
+    string key = idToBitString(id);
+    //cout << "bitstring: " << key << endl;
+    key = getLastIBits(key, bitRep);
+
+    // Flip bits if decimal rep is bigger than bucket amount
+    if (binaryStrToDecimal(key) >= buckets) {
+        key = flipBit(key);
+    }
+
     return key;
 }
 
@@ -226,7 +274,7 @@ void insertRecord(struct record rec) {
     
     // Flip bits if decimal rep is bigger than bucket amount
     if (binaryStrToDecimal(key) >= buckets) {
-        key = flipBits(key);
+        key = flipBit(key);
 
     }
 
@@ -272,6 +320,17 @@ void reorderTable() {
 
     } 
     */
+}
+
+int countLinesOfIndex() {
+    string line;
+    int count = 0;
+    ifstream indexfile {"EmployeeIndex"};
+
+    while (getline(indexfile, line)) {
+        count++;
+    }
+    return count;
 }
 
 string getLineOfIndex(int lineNumber) {
