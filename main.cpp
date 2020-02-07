@@ -19,14 +19,14 @@ struct record {
 };
 
 // Global Variables
-vector<struct record> readRecords(string csvName); // Record list
 map<string, vector<struct record>> lhTable; // Linear Hash Table
-int buckets = 4; // amount of buckets currently in the index
-int bitRep = 2; // amount of bits currently being used in the keys
-int totalSpaceUsed = 0; // amount of bytes the records are taking up
+int buckets; // amount of buckets currently in the index
+int bitRep; // amount of bits currently being used in the keys
+int totalSpaceUsed; // amount of bytes the records are taking up
 
 
 // Function prototypes
+void processRecords(string csvName);
 void createIndex();
 void lookupId(string id);
 struct record* add_record(string id, string name, string bio, string manager_id); 
@@ -43,7 +43,9 @@ void changeLineOfIndex(int lineNumber, string newLine);
 void addLineToIndex(string newLine);
 int getIndexLineNumber(string index);
 vector<struct record> readRecordsAtIndex(string index);
+void writeRecordsAtIndex(string index, vector<struct record> records);
 string idToIndexKey(string id);
+void initIndex();
 
 int main(int argc, char* argv[])
 {
@@ -73,29 +75,39 @@ int main(int argc, char* argv[])
         lookupId(id);
     }
 
-
-idToBitString
     return 0;
 }
 
 void createIndex() {
     cout << "Creating index from csv file..." << endl;
 
+    // initialize with two buckets
+    initIndex();
+    bitRep = 1;
+    buckets = 2;
+    totalSpaceUsed = 0;
+
+
     //struct record* newRecord = add_record("10000000", "Dan", "Likes dogs", "00000001");
     //cout << newRecord->bio << endl;
 
 
-    vector<struct record> csvRecords = readRecords("Employee.csv");
+    //vector<struct record> csvRecords = processRecords("Employee.csv");
+    processRecords("Employee.csv");
     //cout << csvRecords[1].name << endl; 
 
     // Initialize lht with 1 bit
+
+
+
+    /*
     lhTable.insert(pair<string, vector<struct record>>("0", vector<struct record>()));
     lhTable.insert(pair<string, vector<struct record>>("1", vector<struct record>()));
 
     for (int i=0; i < csvRecords.size(); i++) {
         insertRecord(csvRecords[i]);
     }
-
+    */
 }
 
 void lookupId(string id) {
@@ -111,6 +123,7 @@ void lookupId(string id) {
     } while (c != '|');
     keySize--; // don't include delimeter in character count
     bitRep = keySize;
+    buckets = countLinesOfIndex();
 
     // createkey from id
     string key = idToIndexKey(id);
@@ -121,6 +134,17 @@ void lookupId(string id) {
 
     // lookup records with key
     vector<struct record> records = readRecordsAtIndex(key);
+    cout << records.size() << endl;
+
+    for (int i = 0; i < records.size(); i++) {
+        if (records[i].id == id) {
+            cout << "Record Found ->" << endl;
+            cout << "ID: " << records[i].id << endl;
+            cout << "Name: " << records[i].name << endl;
+            cout << "Bio: " << records[i].bio << endl;
+            cout << "Manager ID: " << records[i].manager_id << endl;
+        }
+    }
 }
 
 int getRecordSize(struct record r) {
@@ -155,11 +179,12 @@ struct record* add_record(string id, string name, string bio, string manager_id)
     return returnRecord; 
 }
 
-vector<struct record> readRecords(string csvName){
-    vector<struct record> records;
+void processRecords(string csvName){
+    //vector<struct record> records;
     vector<string> csvAttributes;
     string attribute; // For tokenizing csv lines
     ifstream infile(csvName);
+    
 
     for(string line; getline(infile, line);)
     {
@@ -170,10 +195,14 @@ vector<struct record> readRecords(string csvName){
             //cout << attribute << endl;
             csvAttributes.push_back(attribute);
         }
-        records.push_back(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
+        //records.push_back(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
+        
+        // Add record to index
+        insertRecord(*add_record(csvAttributes[0], csvAttributes[1], csvAttributes[2], csvAttributes[3]));
+
         csvAttributes.clear();
     }
-    return records;
+    //return records;
 }
 
 vector<struct record> readRecordsAtIndex(string index){
@@ -200,6 +229,28 @@ vector<struct record> readRecordsAtIndex(string index){
         attributes.clear();
     }
     return records;
+}
+
+void writeRecordsAtIndex(string index, vector<struct record> records) {
+    vector<string> attributes;
+    string record; // For tokenizing the line
+    string attribute; // For tokenizing the line
+    ifstream infile("EmployeeIndex");
+
+    int linenumber = getIndexLineNumber(index);
+    string line = getLineOfIndex(linenumber);
+    //line = line.substr(index.length() 1+ , line.length()); // remove key from front of line
+    string key = line.substr(0, bitRep + 1); // get key from front of line
+    string writeline = key;
+
+    for (int i=0; i < records.size(); i++) {
+        writeline = writeline + records[i].id + "," + records[i].name + "," + records[i].bio + "," + records[i].manager_id;
+        if (i != records.size() - 1) {
+            writeline = writeline + "|";
+        }
+    }
+
+    changeLineOfIndex(linenumber, writeline);
 }
 
 int binaryStrToDecimal(string str) {
@@ -269,27 +320,25 @@ string idToIndexKey(string id) {
 
 
 void insertRecord(struct record rec) {
-    string key = idToBitString(rec.id);
-    key = getLastIBits(key, bitRep);
-    
-    // Flip bits if decimal rep is bigger than bucket amount
-    if (binaryStrToDecimal(key) >= buckets) {
-        key = flipBit(key);
+    string key = idToIndexKey(rec.id);
 
-    }
-
-    cout << "ID: " << rec.id << ", key: " << key << endl;
-    cout << "BinaryRep: " << binaryStrToDecimal(key) << endl;
+    //cout << "ID: " << rec.id << ", key: " << key << endl;
+    //cout << "BinaryRep: " << binaryStrToDecimal(key) << endl;
 
     // Find bucket based on key
-    vector <struct record> bucket = lhTable.find(key)->second;
-    bucket.push_back(rec);
+    //vector <struct record> bucket = lhTable.find(key)->second;
+    //bucket.push_back(rec);
 
+    vector<struct record> bucketRecords = readRecordsAtIndex(key);
+    bucketRecords.push_back(rec);
     // Add to space count
     totalSpaceUsed += getRecordSize(rec);
 
+    writeRecordsAtIndex(key, bucketRecords);
+
     // Trigger extension if overload occurs
     //if (totalSpaceUsed / 4096 > 0.8) {
+    /*
     if (totalSpaceUsed / 40 > 0.8) {
        buckets++;
        if (buckets > pow(2, bitRep)) { // Extend key if necessary
@@ -298,8 +347,10 @@ void insertRecord(struct record rec) {
        }
 
        // Add new bucket
-       lhTable.insert(pair<string, vector<struct record>>(toBinary(buckets - 1), vector<struct record>()));
+       //lhTable.insert(pair<string, vector<struct record>>(toBinary(buckets - 1), vector<struct record>()));
+
     }
+    */
 }
 
 void reorderTable() {
@@ -413,6 +464,18 @@ int getIndexLineNumber(string index) {
     }
     cerr << "ERROR: Could not find line number for index" << endl;
     return -5;
+}
+
+void initIndex() {
+    
+    if (remove("EmployeeIndex")!=0) {
+        //cerr << "ERROR: Could not delete old index file" << endl;
+    }
+    
+    ofstream indexfile {"EmployeeIndex"};
+
+    indexfile << "0|\n";
+    indexfile << "1|\n";
 }
 
 

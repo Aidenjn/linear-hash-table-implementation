@@ -1,4 +1,2 @@
-00|00000001,Dan,Has a cool car,10000000|00000000,Staan,Has the pickles,00000000
-01|00000002,Bob,Has a brilliant amount of ducks in his wagon.,20000000
-10|00000003,Cole,Has a cool car,30000000
-11|00000003,Cole,Has a cool car,30000000
+0|00000000,Staan,Has the pickles,00000000|00000002,Bob,Has a brilliant amount of ducks in his wagon.,20000000|00000004,Sam,Has a cool car,40000000
+1|00000001,Dan,Has a cool car,10000000|00000003,Cole,Has a cool car,30000000
